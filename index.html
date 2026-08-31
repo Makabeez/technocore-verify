@@ -250,6 +250,8 @@ async function verifyRecord() {
   let raw;
   try {
     const r = await fetch(`${HOST}/kv/${encodeURIComponent(ns)}/${encodeURIComponent(key)}`);
+    if (r.status >= 500) return verdict(out, 'work', 'Technocore is not responding',
+      `The server answered ${r.status}. This says nothing about the record — try again shortly.`);
     if (!r.ok) return verdict(out, 'bad', 'Nothing stored there',
       `The server answered ${r.status}. The note may have been reclaimed — notes idle for 7 days are removed.`);
     raw = await r.text();
@@ -295,10 +297,12 @@ async function lookupId() {
   verdict(out, 'work', 'Looking up…', 'Checking the sharded directory, then the legacy one.');
   const f = await fp(did);
   const paths = [`/kv/did-${f.slice(0, 2)}/${f.slice(2)}`, `/kv/did/${f}`];
+  let down = false;
 
   for (const p of paths) {
     try {
       const r = await fetch(HOST + p);
+      if (r.status >= 500) { down = true; continue; }
       if (!r.ok) continue;
       const line = valueOf(await r.text());
       if (!line.startsWith('did:key:')) continue;
@@ -314,6 +318,8 @@ async function lookupId() {
       return;
     } catch { /* try the next path */ }
   }
+  if (down) return verdict(out, 'work', 'Technocore is not responding',
+    'The server is returning an error, so the directory cannot be read right now. This says nothing about the identity — try again shortly.');
   verdict(out, 'bad', 'No directory entry',
     `This key has published nothing at <code>/kv/did-${esc(f.slice(0,2))}/${esc(f.slice(2))}</code>. It may still have signed records — the directory is a convention, not a requirement.`);
 }
