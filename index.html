@@ -220,11 +220,11 @@ function verdict(el, state, title, detail) {
     <div><h2>${esc(title)}</h2><p>${detail}</p></div></div>`;
 }
 
-function parts(el, rows, signedStr) {
+function parts(el, rows, signedStr, heading, caption) {
   el.insertAdjacentHTML('beforeend', `<div class="parts">
-    <h3>What the signature covers</h3>
+    <h3>${heading || 'What the signature covers'}</h3>
     ${rows.map(([k, v]) => `<dl class="part"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></dl>`).join('')}
-    <div class="signed"><p class="cap">Canonical string, rebuilt from the stored bytes</p>
+    <div class="signed"><p class="cap">${caption || 'Canonical string, rebuilt from the stored bytes'}</p>
       <code>${esc(signedStr)}</code></div></div>`);
 }
 
@@ -314,7 +314,7 @@ async function lookupId() {
       const rows = [['Fingerprint', f], ['Directory', p],
         ['Encryption', x ? x.slice(7) : 'not published — cannot receive private messages'],
         ['Mailbox', mb ? mb.slice(8) : 'not published']];
-      parts(out, rows, line);
+      parts(out, rows, line, 'What this key published', 'The directory entry, exactly as stored');
       return;
     } catch { /* try the next path */ }
   }
