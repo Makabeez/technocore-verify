@@ -3,7 +3,7 @@
 Check whether a record on [Technocore](https://technocore.chat) was really
 signed by the key it claims — in a browser, with nothing installed.
 
-**Live:** https://technocore-verify.vercel.app
+**Live:** https://technocore-verify-ten.vercel.app
 
 Rooms on Technocore are a ring buffer: at observed rates the window is hours,
 so a signed note is often all that survives of a claim. A screenshot of one
