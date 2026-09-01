@@ -7,13 +7,6 @@
 <meta name="description" content="Check whether a Technocore record was really signed by the key it claims. Runs entirely in your browser.">
 <meta property="og:title" content="Verify a Technocore record">
 <meta property="og:description" content="Paste a record. See exactly what was signed, and whether the signature holds. No account, no install, nothing leaves your browser.">
-<meta property="og:image" content="https://technocore-verify-ten.vercel.app/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://technocore-verify-ten.vercel.app">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://technocore-verify-ten.vercel.app/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -220,11 +213,11 @@ function verdict(el, state, title, detail) {
     <div><h2>${esc(title)}</h2><p>${detail}</p></div></div>`;
 }
 
-function parts(el, rows, signedStr, heading, caption) {
+function parts(el, rows, signedStr) {
   el.insertAdjacentHTML('beforeend', `<div class="parts">
-    <h3>${heading || 'What the signature covers'}</h3>
+    <h3>What the signature covers</h3>
     ${rows.map(([k, v]) => `<dl class="part"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></dl>`).join('')}
-    <div class="signed"><p class="cap">${caption || 'Canonical string, rebuilt from the stored bytes'}</p>
+    <div class="signed"><p class="cap">Canonical string, rebuilt from the stored bytes</p>
       <code>${esc(signedStr)}</code></div></div>`);
 }
 
@@ -250,8 +243,6 @@ async function verifyRecord() {
   let raw;
   try {
     const r = await fetch(`${HOST}/kv/${encodeURIComponent(ns)}/${encodeURIComponent(key)}`);
-    if (r.status >= 500) return verdict(out, 'work', 'Technocore is not responding',
-      `The server answered ${r.status}. This says nothing about the record — try again shortly.`);
     if (!r.ok) return verdict(out, 'bad', 'Nothing stored there',
       `The server answered ${r.status}. The note may have been reclaimed — notes idle for 7 days are removed.`);
     raw = await r.text();
@@ -297,12 +288,10 @@ async function lookupId() {
   verdict(out, 'work', 'Looking up…', 'Checking the sharded directory, then the legacy one.');
   const f = await fp(did);
   const paths = [`/kv/did-${f.slice(0, 2)}/${f.slice(2)}`, `/kv/did/${f}`];
-  let down = false;
 
   for (const p of paths) {
     try {
       const r = await fetch(HOST + p);
-      if (r.status >= 500) { down = true; continue; }
       if (!r.ok) continue;
       const line = valueOf(await r.text());
       if (!line.startsWith('did:key:')) continue;
@@ -314,12 +303,10 @@ async function lookupId() {
       const rows = [['Fingerprint', f], ['Directory', p],
         ['Encryption', x ? x.slice(7) : 'not published — cannot receive private messages'],
         ['Mailbox', mb ? mb.slice(8) : 'not published']];
-      parts(out, rows, line, 'What this key published', 'The directory entry, exactly as stored');
+      parts(out, rows, line);
       return;
     } catch { /* try the next path */ }
   }
-  if (down) return verdict(out, 'work', 'Technocore is not responding',
-    'The server is returning an error, so the directory cannot be read right now. This says nothing about the identity — try again shortly.');
   verdict(out, 'bad', 'No directory entry',
     `This key has published nothing at <code>/kv/did-${esc(f.slice(0,2))}/${esc(f.slice(2))}</code>. It may still have signed records — the directory is a convention, not a requirement.`);
 }
