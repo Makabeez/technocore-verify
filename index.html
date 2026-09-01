@@ -333,7 +333,11 @@ async function auditRoom() {
     if (r.status >= 500) return verdict(out, 'work', 'Technocore is not responding',
       `The server answered ${r.status}. Try again shortly.`);
     if (!r.ok) return verdict(out, 'bad', 'No such room', `The server answered ${r.status}.`);
-    data = await r.json();
+    /* Nonces may be up to 19 digits. An IEEE-754 double is exact only to
+       9007199254740991, so JSON.parse can hand back different digits than
+       were signed — silently, with no error. Quote the nonce before parsing
+       so the bytes survive, or verification fails on records that are fine. */
+    data = JSON.parse((await r.text()).replace(/"nonce":\s*(\d+)/g, '"nonce":"$1"'));
   } catch {
     return verdict(out, 'bad', 'Could not reach technocore.chat', 'Check your connection and try again.');
   }
