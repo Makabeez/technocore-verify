@@ -349,6 +349,7 @@ async function auditRoom() {
 
   const rows = [];
   let bad = 0;
+  const tclk = [];              // tclk/1 frames, if this is a deal room
   for (const m of signed) {
     let ok = false;
     try {
@@ -356,7 +357,15 @@ async function auditRoom() {
         new TextEncoder().encode(`${room}|${m.nonce}|${sweep(m.text)}`), pubFromDid(m.from));
     } catch { ok = false; }
     if (!ok) bad++;
-    rows.push([`${ok ? '✓' : '✕'} #${m.seq}`, `${m.from.slice(9, 21)}…  ${m.text.slice(0, 96)}`]);
+    let label = m.text.slice(0, 96);
+    if (m.text.startsWith('tclk1 ')) {
+      try {
+        const f = JSON.parse(m.text.slice(6));
+        tclk.push(f);
+        label = `${(f.type || '?').padEnd(7)} contract ${String(f.contract || '').slice(0, 18)}…`;
+      } catch { /* leave the raw text */ }
+    }
+    rows.push([`${ok ? '✓' : '✕'} #${m.seq}`, `${m.from.slice(9, 21)}…  ${label}`]);
   }
 
   if (bad === 0) {
@@ -368,6 +377,24 @@ async function auditRoom() {
       'A failing message names a key that did not sign it. Treat its authorship as unproven.');
   }
   parts(out, rows, `${esc(room)}|<nonce>|<swept text>`, 'Message by message', 'The canonical string checked for each');
+
+  /* tclk/1 deal room: a reveal frame carries the secret. The lock asks one
+     question — who knows it — so anyone can check the claim without the rail,
+     without the venue, and without either party. */
+  const reveal = tclk.find(f => f.type === 'reveal' && f.secret);
+  if (reveal) {
+    const raw = reveal.secret.replace(/^0x/, '');
+    const bytes = Uint8Array.from(raw.match(/../g).map(h => parseInt(h, 16)));
+    const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    out.insertAdjacentHTML('beforeend', `<div class="parts">
+      <h3>tclk/1 deal</h3>
+      <dl class="part"><dt>Contract</dt><dd>${esc(String(reveal.contract || ''))}</dd></dl>
+      <dl class="part"><dt>Revealed secret</dt><dd>${esc(reveal.secret)}</dd></dl>
+      <dl class="part"><dt>sha256 of it</dt><dd>0x${esc(digest)}</dd></dl>
+      <div class="signed"><p class="cap">Compare that digest to the hash statement in the offer. If they match, the payee proved it knew the secret and the claim is sound — checkable without the rail, the venue, or either party.</p></div>
+    </div>`);
+  }
   out.insertAdjacentHTML('beforeend',
     `<p class="note">Rooms are where work gets coordinated — task claims, submissions and vouches. Anyone can post to most rooms, so a name in a room proves nothing on its own. A signature does.</p>`);
 }
